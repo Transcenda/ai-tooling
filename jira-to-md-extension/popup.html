@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Jira to Markdown</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      width: 340px;
+      min-height: 200px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #30363d;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: #0052cc;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .header-text h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f0f6fc;
+    }
+
+    .header-text p {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 2px;
+    }
+
+    .content {
+      padding: 20px;
+    }
+
+    .status-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: #8b949e;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-box.error   { border-color: #da3633; color: #f85149; background: #1a0a0a; }
+    .status-box.success { border-color: #238636; color: #3fb950; background: #0a1a0a; }
+    .status-box.info    { border-color: #1f6feb; color: #58a6ff; background: #0a1020; }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    .preview-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 10px;
+      color: #8b949e;
+      max-height: 160px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      display: none;
+      line-height: 1.5;
+    }
+
+    .preview-box .md-heading   { color: #58a6ff; }
+    .preview-box .md-bold      { color: #e6edf3; }
+    .preview-box .md-meta      { color: #3fb950; }
+
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .btn-primary {
+      background: #238636;
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: #2ea043; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+    }
+
+    .btn-secondary:hover { background: #30363d; }
+    .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-copy {
+      background: #1f6feb;
+      color: #fff;
+    }
+    .btn-copy:hover { background: #388bfd; }
+    .btn-copy:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .actions .btn {
+      margin-bottom: 0;
+    }
+
+    .not-jira {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .not-jira .icon { font-size: 32px; margin-bottom: 10px; }
+    .not-jira p { font-size: 12px; color: #8b949e; line-height: 1.5; }
+
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    scrollbar-width: thin;
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">J</div>
+    <div class="header-text">
+      <h1>Jira → Markdown</h1>
+      <p>Export ticket to structured .md file</p>
+    </div>
+  </div>
+
+  <div class="content" id="main-content">
+    <div class="status-box info" id="status-box">
+      <div class="dot"></div>
+      <span id="status-text">Checking page...</span>
+    </div>
+
+    <div class="preview-box" id="preview"></div>
+
+    <button class="btn btn-primary" id="btn-convert" disabled>
+      <div class="spinner" id="spinner"></div>
+      <span id="btn-label">⬇ Convert & Download</span>
+    </button>
+
+    <div class="actions">
+      <button class="btn btn-copy" id="btn-copy" disabled>📋 Copy MD</button>
+      <button class="btn btn-secondary" id="btn-preview" disabled>👁 Preview</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
