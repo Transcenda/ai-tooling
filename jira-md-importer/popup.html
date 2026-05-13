@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  width: 340px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: #172b4d;
+  background: #fff;
+}
+
+/* ── Header ── */
+.header {
+  background: #36b37e;
+  color: #fff;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header svg { flex-shrink: 0; }
+.header-text { font-weight: 600; font-size: 13px; line-height: 1.2; }
+.header-text small { font-weight: 400; opacity: 0.8; font-size: 11px; display: block; }
+
+/* ── Views ── */
+.view { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Idle view ── */
+.hint {
+  background: #f4f5f7;
+  border-radius: 5px;
+  padding: 9px 11px;
+  font-size: 12px;
+  color: #5e6c84;
+  line-height: 1.6;
+}
+.hint strong { color: #172b4d; }
+.hint.ready { background: #e3fcef; color: #006644; }
+
+/* ── Import view ── */
+.drop-zone {
+  border: 1.5px dashed #b3bac5;
+  border-radius: 6px;
+  padding: 16px 12px;
+  text-align: center;
+  color: #5e6c84;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: border-color .15s, background .15s;
+}
+.drop-zone.drag-over { border-color: #36b37e; background: #e3fcef; }
+.drop-zone svg { opacity: 0.4; margin-bottom: 2px; }
+.drop-zone code { font-family: monospace; background: #f0f1f4; padding: 1px 4px; border-radius: 3px; }
+.or-label { font-size: 11px; color: #b3bac5; margin: 2px 0; }
+
+.sep {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: #b3bac5;
+}
+.sep::before, .sep::after { content: ''; flex: 1; height: 1px; background: #dfe1e6; }
+
+#paste-area {
+  width: 100%; min-height: 80px; resize: vertical;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px; line-height: 1.5;
+  padding: 8px 10px;
+  border: 1px solid #dfe1e6; border-radius: 5px;
+  color: #172b4d; background: #fafbfc;
+  outline: none; transition: border-color .15s;
+  user-select: text;
+}
+#paste-area:focus { border-color: #4c9aff; background: #fff; box-shadow: 0 0 0 2px #4c9aff33; }
+
+#preview {
+  background: #f4f5f7; border-radius: 5px;
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.preview-row { display: flex; gap: 6px; font-size: 12px; align-items: baseline; }
+.preview-lbl {
+  font-weight: 600; color: #5e6c84; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .3px;
+  min-width: 52px; flex-shrink: 0;
+}
+.preview-val { color: #172b4d; word-break: break-word; line-height: 1.4; }
+
+.actions { display: flex; gap: 8px; }
+
+/* ── Buttons ── */
+.btn {
+  width: 100%; background: #36b37e; color: #fff;
+  border: none; border-radius: 4px;
+  padding: 8px 12px; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: background .15s; font-family: inherit;
+}
+.btn:hover:not(:disabled) { background: #00875a; }
+.btn:disabled { background: #b3bac5; cursor: not-allowed; }
+.btn.grow { flex: 1; width: auto; }
+.btn-sec {
+  background: #f4f5f7; color: #344563;
+  border: 1px solid #dfe1e6; border-radius: 4px;
+  padding: 6px 12px; font-size: 12px; cursor: pointer;
+  transition: background .15s; font-family: inherit; white-space: nowrap;
+}
+.btn-sec:hover { background: #ebecf0; }
+
+.status { font-size: 11px; color: #5e6c84; text-align: center; min-height: 14px; }
+.status.ok { color: #006644; }
+.status.err { color: #bf2600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+  </svg>
+  <div class="header-text">MD Importer<small>for Jira</small></div>
+</div>
+
+<!-- Idle: waiting for Create Issue dialog -->
+<div class="view" id="view-idle">
+  <div class="hint" id="idle-hint">Checking for Jira Create Issue dialog…</div>
+  <button class="btn" id="btn-activate" disabled>Import MD file</button>
+  <div class="status" id="idle-status"></div>
+</div>
+
+<!-- Import: file picker + preview + fill -->
+<div class="view" id="view-import" style="display:none">
+
+  <div class="drop-zone" id="drop-zone">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <div>Drop <code>.md</code> file here</div>
+    <div class="or-label">or</div>
+    <button class="btn-sec" id="btn-browse">Browse file</button>
+    <input type="file" id="file-input" accept=".md,.txt" style="display:none">
+  </div>
+
+  <div class="sep"><span>or paste markdown</span></div>
+
+  <textarea id="paste-area"
+    placeholder="# MCC-XXXX — Title&#10;### Background&#10;What: ...&#10;### Requirement&#10;...&#10;### Acceptance Criteria&#10;AC 01 - ..."></textarea>
+
+  <div id="preview" style="display:none">
+    <div class="preview-row">
+      <span class="preview-lbl">Summary</span>
+      <span class="preview-val" id="prev-summary"></span>
+    </div>
+    <div class="preview-row">
+      <span class="preview-lbl">Repo</span>
+      <span class="preview-val" id="prev-repo"></span>
+    </div>
+    <div class="preview-row">
+      <span class="preview-lbl">Labels</span>
+      <span class="preview-val" id="prev-labels"></span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn grow" id="btn-fill" disabled>Fill Create Issue form</button>
+    <button class="btn-sec" id="btn-back">← Back</button>
+  </div>
+  <div class="status" id="fill-status"></div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Jira MD Importer",
+  "description": "Fill Jira Create Issue form from a markdown ticket file",
+  "version": "1.1.0",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://*.atlassian.net/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://*.atlassian.net/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Jira MD Importer"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
