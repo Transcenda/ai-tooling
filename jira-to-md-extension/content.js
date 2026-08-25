@@ -166,6 +166,7 @@
 
     // Also try to parse named sections from the description (Background, Requirement, etc.)
     data.sections = parseDescriptionSections(descModule);
+    data.comments = scrapeComments();
 
     data.url = window.location.href;
     return data;
@@ -212,8 +213,58 @@
     data.rawDescEl = descEl;
     data.sections = parseDescriptionSections(descEl);
     data.links = Array.from(document.querySelectorAll('[data-testid*="issue-link"] a')).map(e => e.innerText.trim()).filter(Boolean);
+    data.comments = scrapeComments();
     data.url = window.location.href;
     return data;
+  }
+
+  // ─── Comments ────────────────────────────────────────────────────────────────
+  // Supports Jira Server/Data Center activity stream and modern Jira Cloud comment items.
+
+  function scrapeComments() {
+    const containerSelectorSets = [
+      // Modern Jira Cloud
+      '[data-testid="issue.activity.comment"]',
+      '[data-testid$="comment-base-item"]',
+      '[data-testid*="comment"][data-testid*="item"]',
+      // Jira Server / Data Center
+      '.issue-data-block[id^="comment-"]',
+      '.activity-comment',
+    ];
+
+    let containers = [];
+    for (const sel of containerSelectorSets) {
+      containers = Array.from(document.querySelectorAll(sel));
+      if (containers.length) break;
+    }
+
+    const comments = [];
+    const seen = new Set();
+
+    containers.forEach(c => {
+      const authorEl = c.querySelector(
+        '[data-testid*="author"], a.user-hover, .action-details a, [class*="author"] a, [class*="author"]'
+      );
+      const authorName = authorEl?.innerText?.trim() || '';
+
+      const timeEl = c.querySelector('time, [data-testid*="timestamp"], .action-details time, .livestamp');
+      const timestamp = timeEl?.getAttribute('datetime') || timeEl?.innerText?.trim() || '';
+
+      const bodyEl = c.querySelector(
+        '[data-testid*="comment-body"], [data-testid*="content"] .ProseMirror, .ProseMirror, .action-body, .comment-body'
+      ) || c;
+
+      const body = htmlToMarkdown(bodyEl).trim();
+      if (!body) return;
+
+      const key = authorName + '|' + body.slice(0, 80);
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      comments.push({ author: authorName, timestamp, body });
+    });
+
+    return comments;
   }
 
   // ─── Parse named sections from description ──────────────────────────────────
@@ -354,6 +405,19 @@
       lines.push('### Description');
       lines.push(htmlToMarkdown(data.rawDescEl));
       lines.push('');
+    }
+
+    // Comments
+    if (data.comments?.length) {
+      lines.push('### Comments');
+      lines.push('');
+      data.comments.forEach(c => {
+        const header = [c.author, c.timestamp].filter(Boolean).join(' — ');
+        lines.push(`**${header || 'Comment'}**`);
+        lines.push('');
+        lines.push(c.body);
+        lines.push('');
+      });
     }
 
     // Footer
